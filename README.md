@@ -29,8 +29,8 @@ automatically supports persistence data storage.
 
 # Usage
 
-You can use this the "create_node_map" command to create a new method.
-Its syntax is
+You can use the "create_node_map" command to create a new 2d map.
+The syntax is
 ```
 create_node_map (width, height) default_field
 ```

@@ -203,21 +203,35 @@ let pos_in_map (x, y) map =
 
 (** Returns the field in the map on the given position *)
 let field_at pos map =
-    let rec aux (inner_x, inner_y) tree = function
-        | 1 -> field_of_tree map tree
-        | size ->
-                match tree with
-                | Field field -> field
-                | Function fn ->
-                        aux (inner_x, inner_y) (resolve_fn (Function fn)) size
-                | Node node ->
-                    let new_pos = (inner_x mod 2, inner_y mod 2)
-                    and new_size = size / 2 in
-                    let direction = get_direction (inner_x, inner_y) size in
-                    let sub_tree = dig node direction in
-                    aux new_pos sub_tree new_size in
+    (* Recursive sub function which digs down the tree until it discovers
+     * a field.  Or if size gets 0 and then it returns the default_field.
+     *)
+    let rec aux (inner_x, inner_y) size = function
+        (* We are done here *)
+        | Field field -> field
+        (* We have function, lets evaluate it and work with the result *)
+        | Function fn ->
+                aux (inner_x, inner_y) size (resolve_fn (Function fn))
+        (* We have a node, dig down more *)
+        | Node node ->
+            (* We are done if size is 0 *)
+            if size <= 0 then map.default_field
+            else
+                (* Create new position and size for the recursive call *)
+                let new_pos = (inner_x mod 2, inner_y mod 2)
+                and new_size = size / 2 in
+
+                (* Find the quarter where we have to go *)
+                let direction = get_direction (inner_x, inner_y) size in
+
+                (* Lets go deeper *)
+                let sub_tree = dig node direction in
+
+                (* Continue with sub node *)
+                aux new_pos new_size sub_tree in
+    (* Check if pos is valid.  If not return the default_field. *)
     if pos_in_map pos map then
-        aux pos map.tree (pow 2 map.depth)
+        aux pos (pow 2 map.depth) map.tree
     else
         map.default_field
 
@@ -226,21 +240,40 @@ let field_at pos map =
  * This function will return a new map.
  *)
 let set_field pos field map =
-    let rec aux (inner_x, inner_y) tree = function
-        | 1 -> Field field
-        | size ->
-                match tree with
-                (* Stop if there is an unexpected field or function *)
-                | Field f -> Field f
-                | Function fn -> Function fn
-                | Node node ->
-                    let new_pos = (inner_x mod 2, inner_y mod 2)
-                    and new_size = size / 2 in
-                    let direction = get_direction (inner_x, inner_y) size in
-                    let sub_tree = dig node direction in
-                    let new_sub_tree = aux new_pos sub_tree new_size in
-                    Node (put node new_sub_tree direction) in
+    (* Recursive function which replaces the field and all nodes which are
+     * between the root and this field.  The new root will be returned. *)
+    let rec aux (inner_x, inner_y) size = function
+         (* If we are at the field then lets set it *)
+         | Field f -> Field field
+
+         (* No support for functions now *)
+         | Function fn -> Function fn
+
+         (* If there is a node, lets replace one of its childs *)
+         | Node node ->
+             (* Stop if size is 0.  Return the current node so nothing is
+              * changed. *)
+             if size <= 0 then Node node
+             else
+                (* Calculate now pos and size for recursion call *)
+                let new_pos = (inner_x mod 2, inner_y mod 2)
+                and new_size = size / 2 in
+
+                (* Find out where to go next *)
+                let direction = get_direction (inner_x, inner_y) size in
+
+                (* Get the sub tree *)
+                let sub_tree = dig node direction in
+
+                (* Do recursive call on the sub tree *)
+                let new_sub_tree = aux new_pos new_size sub_tree in
+
+                (* and replace the subtree with its result *)
+                Node (put node new_sub_tree direction) in
+    (* Check if pos is valid.  If not, simply return the map so nothing is
+     * changed. *)
     if pos_in_map pos map then
-        map_set_tree (aux pos map.tree (pow 2 map.depth)) map
+        (* Change the tree of the map with the new one *)
+        map_set_tree (aux pos (pow 2 map.depth) map.tree) map
     else
         map

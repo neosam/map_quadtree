@@ -41,9 +41,9 @@ type 'a four_tuple = 'a * 'a * 'a * 'a
 (**
  * Lets define some kind of commands for the dynamic trees.
  *)
-type command =
+type 'a command =
     | Read
-    | Write
+    | Write of 'a
 
 (**
  * Quadtree definition.
@@ -58,7 +58,7 @@ type 'a tree =
     (* It can have a generator function which produces a Field or a Node 
      * If it generates a new Functon, it also must be evaluated.  This
      * can lead in a infinity loop. *)
-    | Function of (command -> 'a tree)
+    | Function of ('a tree command -> 'a tree)
 
 (**
  * To navigate while drilling down the tree, there are four directions.
@@ -88,9 +88,6 @@ type 'a map = {
 
 
 
-
-
-
 (****** Helper functions *)
 
 (* Calculate the depth according to the map dimension.  Size is an integer
@@ -117,17 +114,17 @@ let rec pow x y =
 
 (* Evaluate the lazy function if it is one.
  * Will return a Field or Node. *)
-let rec resolve_fn command = function
+let rec resolve_fn = function
     | Field field -> Field field
     | Node node -> Node node
-    | Function fn -> resolve_fn command (fn command)
+    | Function fn -> resolve_fn (fn Read)
 
 (* Dig down one level on a node *)
-let dig (tl, tr, bl, br) command = function
-    | Top_left -> resolve_fn command tl
-    | Top_right -> resolve_fn command tr
-    | Bottom_left -> resolve_fn command bl
-    | Bottom_right -> resolve_fn command br
+let dig (tl, tr, bl, br) = function
+    | Top_left -> resolve_fn tl
+    | Top_right -> resolve_fn tr
+    | Bottom_left -> resolve_fn bl
+    | Bottom_right -> resolve_fn br
 
 (* Replace a child of a node with "x" *)
 let put (tl, tr, bl, br) x = function
@@ -163,13 +160,13 @@ let get_direction (x, y) size =
  * Use the direction list to walk through the tree.  Return the node if
  * the list is empty and return if it hits a field before it's empty.
  *)
-let rec walk_through_tree tree command = function
+let rec walk_through_tree tree = function
     | [] -> tree
     | direction :: t -> match tree with
         | Field f -> Field f
-        | Node node -> walk_through_tree (dig node command direction) command t
-        | Function fn -> walk_through_tree (resolve_fn command (Function fn))
-                                                    command (direction :: t)
+        | Node node -> walk_through_tree (dig node direction) t
+        | Function fn -> walk_through_tree (resolve_fn (Function fn))
+                                                    (direction :: t)
 
 
 (****** Map functions *)
@@ -178,7 +175,7 @@ let rec walk_through_tree tree command = function
  * It will calculate the required depth from the given size, generate the
  * tree and returns it along with some other information. *)
 let create_node_map (width, height) default_field =
-    let depth = depth_of_size (min width height) in {
+    let depth = depth_of_size (max width height) in {
         tree = create_node_tree depth default_field;
         size = (width, height);
         depth = depth;
@@ -192,11 +189,11 @@ let map_set_tree tree map = { map with tree = tree }
  * If it's a node, it will return the default_field and if it's a function,
  * it will evaluate it.
  *)
-let rec field_of_tree map command = function
+let rec field_of_tree map = function
     | Field field -> field
     | Node node -> map.default_field
-    | Function fn -> field_of_tree map command
-                            (resolve_fn command (Function fn))
+    | Function fn -> field_of_tree map
+                            (resolve_fn (Function fn))
 
 
 (** Check whether (x, y) is in the map (true) or out of bounds (false). *)
@@ -214,7 +211,7 @@ let field_at pos map =
         | Field field -> field
         (* We have function, lets evaluate it and work with the result *)
         | Function fn ->
-                aux (inner_x, inner_y) size (resolve_fn Read (Function fn))
+                aux (inner_x, inner_y) size (resolve_fn (Function fn))
         (* We have a node, dig down more *)
         | Node node ->
             (* We are done if size is 0 *)
@@ -228,7 +225,7 @@ let field_at pos map =
                 let direction = get_direction (inner_x, inner_y) size in
 
                 (* Lets go deeper *)
-                let sub_tree = dig node Read direction in
+                let sub_tree = dig node direction in
 
                 (* Continue with sub node *)
                 aux new_pos new_size sub_tree in
@@ -250,7 +247,11 @@ let set_field pos field map =
          | Field f -> Field field
 
          (* No support for functions now *)
-         | Function fn -> Function fn
+         | Function fn ->
+                 let resolved_tree = aux (inner_x, inner_y) size
+                                        (resolve_fn (Function fn)) in
+                 fn (Write resolved_tree)
+
 
          (* If there is a node, lets replace one of its childs *)
          | Node node ->
@@ -266,7 +267,7 @@ let set_field pos field map =
                 let direction = get_direction (inner_x, inner_y) size in
 
                 (* Get the sub tree *)
-                let sub_tree = dig node Write direction in
+                let sub_tree = dig node direction in
 
                 (* Do recursive call on the sub tree *)
                 let new_sub_tree = aux new_pos new_size sub_tree in
@@ -312,7 +313,7 @@ let init_tree_func min_depth fn command =
  * it's own tree objects.
  *)
 let create_dynamic_map (width, height) (default_field: 'a) (loader_depth: int)
-                                (fn: int * int -> int -> command -> 'a tree) =
+                                (fn: int * int -> int -> 'a tree command -> 'a tree) =
     let depth = depth_of_size (max width height) in
     let tree = init_tree_func loader_depth fn in {
         tree = Function tree;

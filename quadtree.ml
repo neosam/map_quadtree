@@ -148,6 +148,16 @@ let create_node_tree init_depth default_field =
                 Node (new_node, new_node, new_node, new_node) in
     aux init_depth
 
+(** Get direction depending on the size and position
+ * In a square which has the dimension size * size, on which quarter
+ * of it is (x, y) located.
+ *)
+let get_direction (x, y) size =
+    let half = size / 2 in
+    if       x < half  && y <  half then    Top_left
+    else if  x >= half && y <  half then    Top_right
+    else if  x < half  && y >= half then    Bottom_left
+    else                                    Bottom_right
 
 
 
@@ -177,16 +187,6 @@ let rec field_of_tree map command = function
     | Function fn -> field_of_tree map command
                             (resolve_fn command (Function fn))
 
-(** Get direction depending on the size and position
- * In a square which has the dimension size * size, on which quarter
- * of it is (x, y) located.
- *)
-let get_direction (x, y) size =
-    let half = size / 2 in
-    if       x < half  && y <  half then    Top_left
-    else if  x >= half && y <  half then    Top_right
-    else if  x < half  && y >= half then    Bottom_left
-    else                                    Bottom_right
 
 (** Check whether (x, y) is in the map (true) or out of bounds (false). *)
 let pos_in_map (x, y) map =
@@ -318,5 +318,6 @@ let rec static_node_tree depth_to_go field (x, y) depth _ =
 
 (** Returns the field immeditelly without any depth calculation *)
 let create_static_field field (_, _) _ _ = Field field
+
 
 

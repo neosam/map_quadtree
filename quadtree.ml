@@ -290,3 +290,33 @@ let rec tree_func (x, y) (current_depth: int) min_depth fn command =
           Function (tree_func (x * 2 + 0, y * 2 + 1) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 1, y * 2 + 1) (new_depth) min_depth fn))
 
+(* Shortcut for inner_tree_func required for initialization by settings
+ * the initial values.  min_depth, fn and command is left. *)
+let init_tree_func min_depth fn command =
+    tree_func (0, 0) 0 min_depth fn command
+
+(**
+ * Create a dynamic map using function generators until it reaches
+ * "loader_depth".  At loader_depth, fn is called and can generate
+ * Which can returns it's own tree objects.
+ *)
+let create_dynamic_map (width, height) (default_field: 'a) (loader_depth: int)
+                                (fn: int * int -> int -> command -> 'a tree) =
+    let depth = depth_of_size (max width height) in
+    let tree = init_tree_func loader_depth fn in {
+        tree = Function tree;
+        size = (width, height);
+        depth = depth;
+        default_field = default_field
+    }
+
+(**** Some loaders *)
+
+(** Returns a node tree with the given depth *)
+let rec static_node_tree depth_to_go field (x, y) depth _ =
+    create_node_tree (depth_to_go - depth) field
+
+(** Returns the field immeditelly without any depth calculation *)
+let create_static_field field (_, _) _ _ = Field field
+
+

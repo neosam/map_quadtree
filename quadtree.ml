@@ -149,24 +149,6 @@ let create_node_tree init_depth default_field =
     aux init_depth
 
 
-(****** Dynamic tree functions *)
-
-(* Default tree function.
- * It will automatically generate sub nodes if called.
- * While it creates its sub functions, it will also calculate their
- * positions and depth.
- * As soon as it hits a specific depth, it will call 'fn' and pass the
- * position and depth.  This for example can be a loader function which
- * loads data from the hard drive.
- *)
-let rec tree_func (x, y) (current_depth: int) min_depth fn command =
-    if current_depth <= min_depth then fn (x, y) current_depth command
-    else let new_depth = current_depth - 1 in Node (
-          Function (tree_func (x * 2 + 0, y * 2 + 0) (new_depth) min_depth fn),
-          Function (tree_func (x * 2 + 1, y * 2 + 0) (new_depth) min_depth fn),
-          Function (tree_func (x * 2 + 0, y * 2 + 1) (new_depth) min_depth fn),
-          Function (tree_func (x * 2 + 1, y * 2 + 1) (new_depth) min_depth fn))
-
 
 
 (****** Map functions *)
@@ -287,3 +269,24 @@ let set_field pos field map =
         map_set_tree (aux pos (pow 2 map.depth) map.tree) map
     else
         map
+
+
+
+(****** Dynamic map functions *)
+
+(* Default tree function.
+ * It will automatically generate sub nodes if called.
+ * While it creates its sub functions, it will also calculate their
+ * positions and depth.
+ * As soon as it hits a specific depth, it will call 'fn' and pass the
+ * position and depth.  This for example can be a loader function which
+ * loads data from the hard drive.
+ *)
+let rec tree_func (x, y) (current_depth: int) min_depth fn command =
+    if current_depth <= min_depth then fn (x, y) current_depth command
+    else let new_depth = current_depth - 1 in Node (
+          Function (tree_func (x * 2 + 0, y * 2 + 0) (new_depth) min_depth fn),
+          Function (tree_func (x * 2 + 1, y * 2 + 0) (new_depth) min_depth fn),
+          Function (tree_func (x * 2 + 0, y * 2 + 1) (new_depth) min_depth fn),
+          Function (tree_func (x * 2 + 1, y * 2 + 1) (new_depth) min_depth fn))
+

@@ -283,8 +283,8 @@ let set_field pos field map =
  * loads data from the hard drive.
  *)
 let rec tree_func (x, y) (current_depth: int) min_depth fn command =
-    if current_depth <= min_depth then fn (x, y) current_depth command
-    else let new_depth = current_depth - 1 in Node (
+    if current_depth >= min_depth then fn (x, y) current_depth command
+    else let new_depth = current_depth + 1 in Node (
           Function (tree_func (x * 2 + 0, y * 2 + 0) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 1, y * 2 + 0) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 0, y * 2 + 1) (new_depth) min_depth fn),

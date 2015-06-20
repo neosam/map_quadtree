@@ -297,8 +297,8 @@ let init_tree_func min_depth fn command =
 
 (**
  * Create a dynamic map using function generators until it reaches
- * "loader_depth".  At loader_depth, fn is called and can generate
- * Which can returns it's own tree objects.
+ * "loader_depth".  At loader_depth, fn is called and will generate
+ * it's own tree objects.
  *)
 let create_dynamic_map (width, height) (default_field: 'a) (loader_depth: int)
                                 (fn: int * int -> int -> command -> 'a tree) =

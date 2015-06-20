@@ -36,20 +36,22 @@ create_node_map (width, height) default_field
 ```
 
 * (width, height) stands for the size of the map and
-* default_field will be used to fill the map.  It will also be used if something is unexpected or out of bounds.
+* default_field will be used to fill the map.  It will also be used if 
+something is unexpected or out of bounds.
 
 This is an example to create a 200x150 sized field of empty strings:
 ```ocaml
 let map = create_node_map (200, 150) ""
 ```
 
-This is pretty fast, you can also create an 1,000,000 x 1,000,000 field without any problem:
+This is pretty fast, you can also create an 1,000,000 x 1,000,000 field without
+any problem:
 ```ocaml
 let map = create_node_map (1000000, 1000000) ""
 ```
 
-You can look at your memory and you will see no big change.  But it will increase if the field are set with
-different values.
+You can look at your memory and you will see no big change.  But it will
+increase if the field are set with different values.
 
 To get a field, the "field_at" function can be used:
 ```ocaml
@@ -57,8 +59,9 @@ field_at (23, 42) map
 ```
 You will get an empty string as defined as default above.
 
-With "set_field", you can replace a field in the map.  Please note the map itself is immutable.  Instead of
-changing the map, the "set_field" function will return a new map.  Try this out:
+With "set_field", you can replace a field in the map.  Please note the map
+itself is immutable.  Instead of changing the map, the "set_field" function
+will return a new map.  Try this out:
 
 ```ocaml
 let map2 = set_field (23, 42) "foo" map;;
@@ -66,12 +69,14 @@ field_at (23, 42) map;;
 field_at (23, 42) map2;;
 ```
 
-You will get an empty string for the "field_at" call with map and "foo" for the field_at call with map2.
+You will get an empty string for the "field_at" call with map and "foo" for
+the field_at call with map2.
 
 
 # Data structure
 
-Lets talk about more details of the data structure.  Basically it looks like this:
+Lets talk about more details of the data structure.  Basically it looks like
+this:
 ```
        node
      / |  | \

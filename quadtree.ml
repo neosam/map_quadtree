@@ -159,6 +159,17 @@ let get_direction (x, y) size =
     else if  x < half  && y >= half then    Bottom_left
     else                                    Bottom_right
 
+(**
+ * Use the direction list to walk through the tree.  Return the node if
+ * the list is empty and return if it hits a field before it's empty.
+ *)
+let rec walk_through_tree tree command = function
+    | [] -> tree
+    | direction :: t -> match tree with
+        | Field f -> Field f
+        | Node node -> walk_through_tree (dig node command direction) command t
+        | Function fn -> walk_through_tree (resolve_fn command (Function fn))
+                                                    command (direction :: t)
 
 
 (****** Map functions *)

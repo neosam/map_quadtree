@@ -139,6 +139,14 @@ let dig ((tl, tr, bl, br): 'a node) (direction: direction): 'a tree =
     | Bottom_left -> resolve_fn bl
     | Bottom_right -> resolve_fn br
 
+(* Dig down one level don't resolve functions *)
+let dig_no_func ((tl, tr, bl, br): 'a node) (direction: direction): 'a tree =
+    match direction with
+    | Top_left -> tl
+    | Top_right -> tr
+    | Bottom_left -> bl
+    | Bottom_right -> br
+
 (* Replace a child of a node with "x" *)
 let put ((tl, tr, bl, br): 'a node)
         (sub_tree: 'a tree)
@@ -290,7 +298,7 @@ let set_field (pos: int pair) (field: 'a) (map: 'a map): 'a map =
                 let direction = get_direction (inner_x, inner_y) size in
 
                 (* Get the sub tree *)
-                let sub_tree = dig node direction in
+                let sub_tree = dig_no_func node direction in
 
                 (* Do recursive call on the sub tree *)
                 let new_sub_tree = aux new_pos new_size sub_tree in
@@ -322,12 +330,17 @@ let rec tree_func ((x, y): int pair)
                   (min_depth: int)
                   (fn: 'a loader_function)
                   (command: 'a tree command): 'a tree =
-    if current_depth >= min_depth then fn (x, y) current_depth command
-    else let new_depth = current_depth + 1 in Node (
+    if current_depth >= min_depth then
+          fn (x, y) current_depth command
+    else match command with
+    | Read -> let new_depth = current_depth + 1 in Node (
           Function (tree_func (x * 2 + 0, y * 2 + 0) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 1, y * 2 + 0) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 0, y * 2 + 1) (new_depth) min_depth fn),
           Function (tree_func (x * 2 + 1, y * 2 + 1) (new_depth) min_depth fn))
+    (* Block write access if we still drilling down *)
+    | Write _ ->
+          Function (tree_func (x, y) current_depth min_depth fn)
 
 (* Shortcut for inner_tree_func required for initialization by settings
  * the initial values.  min_depth, fn and command is left. *)
@@ -365,4 +378,80 @@ let rec static_node_tree depth_to_go (field: 'a)
 let create_static_field (field: 'a) (_, _) _ _: 'a tree = Field field
 
 
+(** Subtree which uses files as persistence memory.
+ * It will access files using filename_fn.
+ * If it is called with the write command, it will store the given node in this
+ * filename.
+ * If it is called with the read command, it will load the file.  If it cannot
+ * the file, it will create a new node tree with the given depth and the
+ * default field.
+ * *)
+let file_node_tree (filename_fn: int * int -> int -> string)
+                   (depth_to_go: int)
+                   (default_field: 'a)
+                   (pos: int pair)
+                   (depth: int)
+                   (command: 'a tree command): 'a tree =
+    (* First we have to generate the filename *)
+    let filename = filename_fn pos depth in
+    (* Now lets check which action to take *)
+    match command with
+    | Read ->
+            begin
+                (* Ok, lets try to load the map and return it *)
+                try
+                    let in_channel = open_in_bin filename in
+                    let (map: 'a tree) = input_value in_channel in begin
+                        close_in in_channel;
+                        map
+                    end
+                with
+                (* If we have an error, create a new node tree *)
+                    | Sys_error _ -> static_node_tree depth_to_go
+                                                      default_field
+                                                      pos
+                                                      depth
+                                                      Read
+            end
+    | Write tree ->
+            (* Simply dump the tree in a file *)
+            let out_channel = open_out_bin filename in begin
+                output_value out_channel tree;
+                flush out_channel;
+                close_out out_channel;
+                tree
+            end
 
+(** Default filename function.
+ * Generates a string with this format:
+ * <prefix>_<x>_<y>_<depth>.map
+ *)
+let default_filename_fn (prefix: string)
+                        ((x, y): int pair)
+                        (depth: int): string =
+    prefix ^ (string_of_int x) ^
+       "_" ^ (string_of_int y) ^
+       "_" ^ (string_of_int depth) ^
+       ".map"
+
+
+
+(** Creates a dynamic map which automatically saves changes in a file. 
+ * This map makes a difference between the default_field and the
+ * null_field:
+     * The default_field is used for auto generated sub trees.
+     * The null_field is used on out_of_bounds or on other issues
+ * The save_depth defines how big the area, you want to save, should be.
+ * Note that this will be power_of_twoed. *)
+let create_persistence_map ((width, height): int pair)
+                           (default_field: 'a)
+                           (null_field: 'a)
+                           (save_depth: int)
+                           (prefix: string): 'a map =
+    let depth = depth_of_size (max width height) in
+    let loader_depth = depth - save_depth in
+    create_dynamic_map (width, height) 
+                       null_field
+                       loader_depth
+                       (file_node_tree (default_filename_fn prefix)
+                                       depth default_field)

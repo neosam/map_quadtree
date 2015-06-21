@@ -218,8 +218,8 @@ let field_at pos map =
             if size <= 0 then map.default_field
             else
                 (* Create new position and size for the recursive call *)
-                let new_pos = (inner_x mod 2, inner_y mod 2)
-                and new_size = size / 2 in
+                let new_size = size / 2 in
+                let new_pos = (inner_x mod new_size, inner_y mod new_size) in
 
                 (* Find the quarter where we have to go *)
                 let direction = get_direction (inner_x, inner_y) size in
@@ -260,8 +260,8 @@ let set_field pos field map =
              if size <= 0 then Node node
              else
                 (* Calculate now pos and size for recursion call *)
-                let new_pos = (inner_x mod 2, inner_y mod 2)
-                and new_size = size / 2 in
+                let new_size = size / 2 in
+                let new_pos = (inner_x mod new_size, inner_y mod new_size) in
 
                 (* Find out where to go next *)
                 let direction = get_direction (inner_x, inner_y) size in

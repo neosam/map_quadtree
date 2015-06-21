@@ -37,6 +37,10 @@
  * Since this is a quadtree, we need a four tuple
  *)
 type 'a four_tuple = 'a * 'a * 'a * 'a
+(**
+ * Then lets define a pair (used for sizes or positions).
+ *)
+type 'a pair = 'a * 'a
 
 (**
  * Lets define some kind of commands for the dynamic trees.
@@ -59,6 +63,14 @@ type 'a tree =
      * If it generates a new Functon, it also must be evaluated.  This
      * can lead in a infinity loop. *)
     | Function of ('a tree command -> 'a tree)
+
+(** Shortcut for a node *)
+type 'a node = 'a tree four_tuple
+
+(** Shortcut for the tree function *)
+type 'a tree_function = 'a tree command -> 'a tree
+(** Loader funciton *)
+type 'a loader_function = int * int -> int -> 'a tree_function
 
 (**
  * To navigate while drilling down the tree, there are four directions.
@@ -93,14 +105,14 @@ type 'a map = {
 (* Calculate the depth according to the map dimension.  Size is an integer
  * which represents the greater dimension  (max width height).
  *)
-let depth_of_size size =
+let depth_of_size (size: int): int =
     let float_size = float_of_int size in
     let float_depth = (log float_size) /. (log 2.) in
     let depth = (int_of_float float_depth) + 1 in
     depth
 
 (** I don't know the pow function so I implemented it myself *)
-let rec pow x y =
+let rec pow (x: int) (y: int): int =
     let even = (y mod 2) == 0 in
     if y == 0 then 1
     else if even then
@@ -114,30 +126,33 @@ let rec pow x y =
 
 (* Evaluate the lazy function if it is one.
  * Will return a Field or Node. *)
-let rec resolve_fn = function
+let rec resolve_fn (tree: 'a tree): 'a tree = match tree with
     | Field field -> Field field
     | Node node -> Node node
     | Function fn -> resolve_fn (fn Read)
 
 (* Dig down one level on a node *)
-let dig (tl, tr, bl, br) = function
+let dig ((tl, tr, bl, br): 'a node) (direction: direction): 'a tree =
+    match direction with
     | Top_left -> resolve_fn tl
     | Top_right -> resolve_fn tr
     | Bottom_left -> resolve_fn bl
     | Bottom_right -> resolve_fn br
 
 (* Replace a child of a node with "x" *)
-let put (tl, tr, bl, br) x = function
-    | Top_left -> (x, tr, bl, br)
-    | Top_right -> (tl, x, bl, br)
-    | Bottom_left -> (tl, tr, x, br)
-    | Bottom_right -> (tl, tr, bl, x)
+let put ((tl, tr, bl, br): 'a node)
+        (sub_tree: 'a tree)
+        (direction: direction): 'a node = match direction with
+    | Top_left -> (sub_tree, tr, bl, br)
+    | Top_right -> (tl, sub_tree, bl, br)
+    | Bottom_left -> (tl, tr, sub_tree, br)
+    | Bottom_right -> (tl, tr, bl, sub_tree)
 
 
 (* Create a tree which fields are all set to default_field. 
  * To save memory, it will create only one sub-node for each level but
  * will assign it to all four childs. *)
-let create_node_tree init_depth default_field =
+let create_node_tree (init_depth: int) (default_field: 'a): 'a tree =
     let rec aux = function
         | 0 -> Field default_field
         | depth ->
@@ -149,7 +164,7 @@ let create_node_tree init_depth default_field =
  * In a square which has the dimension size * size, on which quarter
  * of it is (x, y) located.
  *)
-let get_direction (x, y) size =
+let get_direction ((x, y): int pair) (size: int): direction  =
     let half = size / 2 in
     if       x < half  && y <  half then    Top_left
     else if  x >= half && y <  half then    Top_right
@@ -160,7 +175,9 @@ let get_direction (x, y) size =
  * Use the direction list to walk through the tree.  Return the node if
  * the list is empty and return if it hits a field before it's empty.
  *)
-let rec walk_through_tree tree = function
+let rec walk_through_tree (tree: 'a tree)
+                          (dir_list: direction list)
+                          : 'a tree = match dir_list with
     | [] -> tree
     | direction :: t -> match tree with
         | Field f -> Field f
@@ -174,7 +191,7 @@ let rec walk_through_tree tree = function
 (** Create a map which uses only nodes and no functions 
  * It will calculate the required depth from the given size, generate the
  * tree and returns it along with some other information. *)
-let create_node_map (width, height) default_field =
+let create_node_map ((width, height): int pair) (default_field: 'a): 'a map =
     let depth = depth_of_size (max width height) in {
         tree = create_node_tree depth default_field;
         size = (width, height);
@@ -183,13 +200,13 @@ let create_node_map (width, height) default_field =
     }
 
 (** Set a new tree on a map *)
-let map_set_tree tree map = { map with tree = tree }
+let map_set_tree tree (map: 'a map): 'a map = { map with tree = tree }
 
 (** Return the field if the last attribute is a field.
  * If it's a node, it will return the default_field and if it's a function,
  * it will evaluate it.
  *)
-let rec field_of_tree map = function
+let rec field_of_tree (map: 'a map) (tree: 'a tree): 'a = match tree with
     | Field field -> field
     | Node node -> map.default_field
     | Function fn -> field_of_tree map
@@ -197,16 +214,19 @@ let rec field_of_tree map = function
 
 
 (** Check whether (x, y) is in the map (true) or out of bounds (false). *)
-let pos_in_map (x, y) map =
+let pos_in_map ((x, y): int pair) (map: 'a map): bool =
     let (width, height) = map.size in
     x >= 0 && x < width && y >= 0 && y < height
 
 (** Returns the field in the map on the given position *)
-let field_at pos map =
+let field_at (pos: int pair) (map: 'a map): 'a =
     (* Recursive sub function which digs down the tree until it discovers
      * a field.  Or if size gets 0 and then it returns the default_field.
      *)
-    let rec aux (inner_x, inner_y) size = function
+    let rec aux ((inner_x, inner_y): int pair)
+                (size: int)
+                (tree: 'a tree): 'a =
+        match tree with
         (* We are done here *)
         | Field field -> field
         (* We have function, lets evaluate it and work with the result *)
@@ -239,10 +259,13 @@ let field_at pos map =
  * Replace the field on the given position.
  * This function will return a new map.
  *)
-let set_field pos field map =
+let set_field (pos: int pair) (field: 'a) (map: 'a map): 'a map =
     (* Recursive function which replaces the field and all nodes which are
      * between the root and this field.  The new root will be returned. *)
-    let rec aux (inner_x, inner_y) size = function
+    let rec aux ((inner_x, inner_y): int pair)
+                (size: int)
+                (tree: 'a tree): 'a tree =
+         match tree with
          (* If we are at the field then lets set it *)
          | Field f -> Field field
 
@@ -294,7 +317,11 @@ let set_field pos field map =
  * position and depth.  This for example can be a loader function which
  * loads data from the hard drive.
  *)
-let rec tree_func (x, y) (current_depth: int) min_depth fn command =
+let rec tree_func ((x, y): int pair)
+                  (current_depth: int)
+                  (min_depth: int)
+                  (fn: 'a loader_function)
+                  (command: 'a tree command): 'a tree =
     if current_depth >= min_depth then fn (x, y) current_depth command
     else let new_depth = current_depth + 1 in Node (
           Function (tree_func (x * 2 + 0, y * 2 + 0) (new_depth) min_depth fn),
@@ -304,7 +331,9 @@ let rec tree_func (x, y) (current_depth: int) min_depth fn command =
 
 (* Shortcut for inner_tree_func required for initialization by settings
  * the initial values.  min_depth, fn and command is left. *)
-let init_tree_func min_depth fn command =
+let init_tree_func (min_depth: int)
+                   (fn: 'a loader_function)
+                   (command: 'a tree command): 'a tree =
     tree_func (0, 0) 0 min_depth fn command
 
 (**
@@ -312,8 +341,10 @@ let init_tree_func min_depth fn command =
  * "loader_depth".  At loader_depth, fn is called and will generate
  * it's own tree objects.
  *)
-let create_dynamic_map (width, height) (default_field: 'a) (loader_depth: int)
-                                (fn: int * int -> int -> 'a tree command -> 'a tree) =
+let create_dynamic_map ((width, height): int pair)
+                       (default_field: 'a)
+                       (loader_depth: int)
+                       (fn: 'a loader_function): 'a map =
     let depth = depth_of_size (max width height) in
     let tree = init_tree_func loader_depth fn in {
         tree = Function tree;
@@ -325,11 +356,13 @@ let create_dynamic_map (width, height) (default_field: 'a) (loader_depth: int)
 (**** Some loaders *)
 
 (** Returns a node tree with the given depth *)
-let rec static_node_tree depth_to_go field (x, y) depth _ =
+let rec static_node_tree depth_to_go (field: 'a)
+                                     ((x, y): int pair)
+                                     (depth: int) _: 'a tree =
     create_node_tree (depth_to_go - depth) field
 
 (** Returns the field immeditelly without any depth calculation *)
-let create_static_field field (_, _) _ _ = Field field
+let create_static_field (field: 'a) (_, _) _ _: 'a tree = Field field
 
 
 

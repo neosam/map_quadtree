@@ -315,6 +315,44 @@ let set_field (pos: int pair) (field: 'a) (map: 'a map): 'a map =
 
 
 
+(**
+ * Get a line from the tree.
+ * This is a quick and dirty implementation without optimizations.
+ *)
+let map_get_line (start_pos: int pair)
+                 (length: int)
+                 (map: 'a map): 'a list =
+    (* Tail-recursive sub-funciton *)
+    let rec aux ((x, y): int pair)
+            (length: int)
+            (list_acc: 'a list): 'a list = match length with
+    | 0 -> list_acc
+    | _ -> let field = field_at (x, y) map in
+            aux (x - 1, y) (length - 1) (field :: list_acc) in
+    let (x, y) = start_pos in
+    aux (x + length - 1, y) length []
+
+(**
+ * Set a line in the tree.
+ * This is a quick and dirty implementation without optimizations.
+ *)
+let map_set_line (start_pos: int pair)
+                 (field_list: 'a list)
+                 (map: 'a map): 'a map =
+    let length = List.length field_list in
+    (* Tail-recursive sub-funciton *)
+    let rec aux ((x, y): int pair)
+            (map_acc: 'a map)
+            (list: 'a list): 'a map = match list with
+    | [] -> map_acc
+    | field :: t -> let new_map = set_field (x, y) field map_acc in
+            aux (x + 1, y) new_map t in
+    aux start_pos map field_list
+
+
+
+
+
 (****** Dynamic map functions *)
 
 (* Default tree function.

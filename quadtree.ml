@@ -465,6 +465,8 @@ let create_static_field (field: 'a) (_, _) _ _: ('a, 'b) tree = Field field
  * default field.
  * *)
 let file_node_tree (filename_fn: int * int -> int -> string)
+                   (tree_gen_fn: int -> 'a -> 'b -> int pair -> int ->
+                                 ('a, 'b) tree command -> ('a, 'b) tree)
                    (depth_to_go: int)
                    (default_field: 'a)
                    (default_node: 'b)
@@ -486,12 +488,12 @@ let file_node_tree (filename_fn: int * int -> int -> string)
                     end
                 with
                 (* If we have an error, create a new node tree *)
-                    | Sys_error _ -> static_node_tree depth_to_go
-                                                      default_field
-                                                      default_node
-                                                      pos
-                                                      depth
-                                                      Read
+                    | Sys_error _ -> tree_gen_fn depth_to_go
+                                                 default_field
+                                                 default_node
+                                                 pos
+                                                 depth
+                                                 Read
             end
     | Write tree ->
             (* Simply dump the tree in a file *)
@@ -536,5 +538,8 @@ let create_persistence_map ((width, height): int pair)
                        default_node
                        loader_depth
                        (file_node_tree (default_filename_fn prefix)
+                                       static_node_tree
                                        depth default_field default_node)
                        (fun (_, _) _ -> default_node)
+
+
